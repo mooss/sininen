@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 )
 
 func AddSubtitleItem(sb *strings.Builder, item *astisub.Item) {
@@ -25,19 +26,44 @@ func AddSubtitleItem(sb *strings.Builder, item *astisub.Item) {
 	}
 }
 
-func SubtitleFileContent(filename string) (string, error) {
+type TranscriptionSegment struct {
+	StartTime time.Duration
+	EndTime   time.Duration
+	EndPos    int
+}
+
+// bleve does not support time.Duration or int, only float so segment information must be stored as floats.
+func (t TranscriptionSegment) ToFloats() (float64, float64, float64) {
+	return t.StartTime.Seconds(), t.EndTime.Seconds(), float64(t.EndPos)
+}
+
+type VideoTranscription struct {
+	Words    string
+	Segments []float64
+}
+
+// Tells bleve what type of document a VideoTranscription is.
+func (VideoTranscription) BleveType() string {
+	return "VideoTranscription"
+}
+
+func ParseSubtitleFile(filename string) (*VideoTranscription, error) {
 	st, err := astisub.OpenFile(filename)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+
+	segments := make([]float64, 0, 3*len(st.Items))
 	var sb strings.Builder
 	for i, item := range st.Items {
 		if i > 0 {
 			sb.WriteRune('\n')
 		}
 		AddSubtitleItem(&sb, item)
+		f1, f2, f3 := TranscriptionSegment{item.StartAt, item.EndAt, sb.Len()}.ToFloats()
+		segments = append(segments, f1, f2, f3)
 	}
-	return sb.String(), nil
+	return &VideoTranscription{sb.String(), segments}, nil
 }
 
 func CreateSubtitleIndex(folder, lang string) (bleve.Index, error) {
@@ -46,23 +72,30 @@ func CreateSubtitleIndex(folder, lang string) (bleve.Index, error) {
 		return nil, err
 	}
 
+	// Define how to index and store data.
+	segmentsMap := bleve.NewNumericFieldMapping()
+	segmentsMap.Store = true
+	segmentsMap.Index = false
+	vtmap := bleve.NewDocumentMapping()
+	vtmap.AddFieldMappingsAt("Segments", segmentsMap) // Default mapping is good enough for Words.
 	mapping := bleve.NewIndexMapping()
 	mapping.DefaultAnalyzer = lang
+	mapping.AddDocumentMapping("VideoTranscription", vtmap) // This is where VideoTranscription.BleveType is pertinent.
 	index, err := bleve.New(path.Join(folder, lang+".bleve"), mapping)
 	if err != nil {
 		return nil, err
 	}
 
+	// Index and store data.
 	for _, file := range files {
 		splitted := strings.Split(file.Name(), ".")
 		if len(splitted) <= 2 || splitted[len(splitted)-2] != lang {
 			continue
 		}
 		filepath := path.Join(folder, file.Name())
-		content, err := SubtitleFileContent(filepath)
-
+		document, err := ParseSubtitleFile(filepath)
 		if err == nil {
-			index.Index(splitted[0], content)
+			index.Index(splitted[0], document)
 		} else {
 			fmt.Fprintln(os.Stderr, err)
 		}
@@ -75,7 +108,10 @@ func OpenSubtitleIndex(folder, lang string) (bleve.Index, error) {
 }
 
 func QueryIndex(query string, index bleve.Index) (*bleve.SearchResult, error) {
-	return index.Search(bleve.NewSearchRequest(bleve.NewMatchQuery(query)))
+	request := bleve.NewSearchRequest(bleve.NewMatchQuery(query))
+	request.Fields = []string{"Segments"}
+	request.IncludeLocations = true
+	return index.Search(request)
 }
 
 func perhapsExit(err error, code int) {
@@ -101,9 +137,10 @@ func main() {
 		os.Exit(2)
 	}
 
-	index, err := OpenSubtitleIndex(subtitlesFolder, "en")
+	lang := "en"
+	index, err := OpenSubtitleIndex(subtitlesFolder, lang)
 	if err != nil {
-		index, err = CreateSubtitleIndex(subtitlesFolder, "en")
+		index, err = CreateSubtitleIndex(subtitlesFolder, lang)
 	}
 	perhapsExit(err, 3)
 
