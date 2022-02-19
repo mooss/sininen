@@ -46,17 +46,17 @@ func (t TranscriptionSegment) ToFloats() (float64, float64, float64) {
 	return t.StartTime.Seconds(), t.EndTime.Seconds(), float64(t.EndPos)
 }
 
-type VideoTranscription struct {
+type Transcription struct {
 	Words    string
 	Segments []float64
 }
 
-// Tells bleve what type of document a VideoTranscription is.
-func (VideoTranscription) BleveType() string {
-	return "VideoTranscription"
+// Tells bleve what type of document a Transcription is.
+func (Transcription) BleveType() string {
+	return "Transcription"
 }
 
-func ParseSubtitleFile(filename string) (*VideoTranscription, error) {
+func ParseSubtitleFile(filename string) (*Transcription, error) {
 	st, err := astisub.OpenFile(filename)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func ParseSubtitleFile(filename string) (*VideoTranscription, error) {
 		f1, f2, f3 := TranscriptionSegment{item.StartAt, item.EndAt, sb.Len()}.ToFloats()
 		segments = append(segments, f1, f2, f3)
 	}
-	return &VideoTranscription{sb.String(), segments}, nil
+	return &Transcription{sb.String(), segments}, nil
 }
 
 ///////////////////
@@ -92,7 +92,7 @@ func CreateSubtitleIndex(folder, lang string) (bleve.Index, error) {
 	vtmap.AddFieldMappingsAt("Segments", segmentsMap) // Default mapping is good enough for Words.
 	mapping := bleve.NewIndexMapping()
 	mapping.DefaultAnalyzer = lang
-	mapping.AddDocumentMapping("VideoTranscription", vtmap) // This is where VideoTranscription.BleveType is pertinent.
+	mapping.AddDocumentMapping("Transcription", vtmap) // This is where Transcription.BleveType is pertinent.
 	index, err := bleve.New(path.Join(folder, lang+".bleve"), mapping)
 	if err != nil {
 		return nil, err
