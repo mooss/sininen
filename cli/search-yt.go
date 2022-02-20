@@ -47,8 +47,8 @@ func main() {
 
 	for _, video := range videos {
 		for _, hit := range video.Segments {
-			fmt.Printf("https://www.youtube.com/watch?v=%s&t=%vs (%v terms, score=%.3f)\n",
-				video.ID, int(hit.StartTime.Seconds()), hit.NTerms, video.Score)
+			fmt.Printf("https://www.youtube.com/watch?v=%s&t=%vs (%v, score=%.3f)\n",
+				video.ID, int(hit.StartTime.Seconds()), hit.Terms, video.Score)
 		}
 	}
 }

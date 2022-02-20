@@ -29,14 +29,14 @@ func TextQuery(query string, index bleve.Index) (*bleve.SearchResult, error) {
 type SegmentHit struct {
 	StartTime time.Duration
 	EndTime   time.Duration
-	NTerms    int // Number of terms in the segment that matched with the search query.
+	Terms     []string // Terms in the segment that matched with the search query.
 }
 
 // SearchResult represents a transcription file that matched with a search query.
 type SearchResult struct {
 	ID       string
 	Score    float64
-	Segments []SegmentHit
+	Segments []SegmentHit // Segments that matched with the search query.
 }
 
 // locateSegment returns the index of the segment containing the given location.
@@ -57,7 +57,7 @@ func locateSegment(segments []interface{}, location *search.Location) int {
 }
 
 // newSegmentHit builds a SegmentInt by extracting information from a serialized segment array.
-func newSegmentHit(segments []interface{}, segmentPos int) (*SegmentHit, error) {
+func newSegmentHit(segments []interface{}, segmentPos int, term string) (*SegmentHit, error) {
 	extract := func(i int) (float64, error) {
 		value, valid := segments[i].(float64)
 		if !valid {
@@ -77,7 +77,7 @@ func newSegmentHit(segments []interface{}, segmentPos int) (*SegmentHit, error) 
 	return &SegmentHit{
 		StartTime: time.Duration(int(floatStart) * int(time.Second)),
 		EndTime:   time.Duration(int(floatEnd) * int(time.Second)),
-		NTerms:    1,
+		Terms:     []string{term},
 	}, nil
 }
 
@@ -100,19 +100,19 @@ func AssembleSearchResults(bleveResults *bleve.SearchResult) ([]SearchResult, er
 		// Segment hits are cached because search hits for different terms can orrur in the same segment.
 		hitCache := map[int]*SegmentHit{}
 		for _, locationMap := range hit.Locations {
-			for _, locations := range locationMap {
+			for term, locations := range locationMap {
 				for _, location := range locations {
 					i := locateSegment(segments, location)
 					if i < 0 {
 						return nil, errors.New("Failed to locate segment.")
 					}
-					segmentHit, err := newSegmentHit(segments, i)
+					segmentHit, err := newSegmentHit(segments, i, term)
 					if err != nil {
 						return nil, err
 					}
 					cachedHit, isCached := hitCache[i]
 					if isCached {
-						cachedHit.NTerms++
+						cachedHit.Terms = append(cachedHit.Terms, term)
 					} else {
 						hitCache[i] = segmentHit
 					}
@@ -122,12 +122,13 @@ func AssembleSearchResults(bleveResults *bleve.SearchResult) ([]SearchResult, er
 
 		sortedSegments := make([]SegmentHit, 0, len(hitCache))
 		for _, el := range hitCache {
+			sort.Strings(el.Terms) // For consistency from one search to the next.
 			sortedSegments = append(sortedSegments, *el)
 		}
 		sort.Slice(sortedSegments, func(i, j int) bool {
 			si, sj := sortedSegments[i], sortedSegments[j]
-			if si.NTerms != sj.NTerms { // To ensure stability of the sorting operation.
-				return si.NTerms > sj.NTerms
+			if len(si.Terms) != len(sj.Terms) { // To ensure stability of the sorting operation.
+				return len(si.Terms) > len(sj.Terms)
 			}
 			return si.StartTime < sj.StartTime
 
