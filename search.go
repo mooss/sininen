@@ -12,9 +12,10 @@ import (
 ///////////////////
 // bleve helpers //
 ///////////////////
+// TextQuery makes a plain text search against an transcription index.
 func TextQuery(query string, index bleve.Index) (*bleve.SearchResult, error) {
 	request := bleve.NewSearchRequest(bleve.NewMatchQuery(query))
-	request.Fields = []string{"Segments"}
+	request.Fields = []string{"Segments"} // Include the Segments field without which the timestamps cannot be deduced.
 	request.IncludeLocations = true
 	return index.Search(request)
 }
@@ -23,12 +24,15 @@ func TextQuery(query string, index bleve.Index) (*bleve.SearchResult, error) {
 // Search results assembly //
 /////////////////////////////
 // That is to say going from raw bleve results to results catered for audio transcriptions.
+
+// SegmentHit represents a transcription segment that matched with a search query.
 type SegmentHit struct {
 	StartTime time.Duration
 	EndTime   time.Duration
-	NTerms    int
+	NTerms    int // Number of terms in the segment that matched with the search query.
 }
 
+// SearchResult represents a transcription file that matched with a search query.
 type SearchResult struct {
 	ID       string
 	Score    float64
