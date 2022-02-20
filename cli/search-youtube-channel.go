@@ -1,8 +1,9 @@
-package sininen
+package main
 
 import (
 	"flag"
 	"fmt"
+	"github.com/mooss/sininen"
 	"os"
 	"path"
 )
@@ -31,16 +32,16 @@ func main() {
 	}
 
 	lang := "en"
-	index, err := OpenTranscriptionIndex(subtitlesFolder, lang)
+	index, err := sininen.OpenTranscriptionIndex(subtitlesFolder, lang)
 	if err != nil {
-		index, err = CreateSubtitleIndex(subtitlesFolder, lang)
+		index, err = sininen.CreateSubtitleIndex(subtitlesFolder, lang)
 	}
 	perhapsExit(err, 3)
 
-	raw, err := TextQuery(textQuery, index)
+	raw, err := sininen.TextQuery(textQuery, index)
 	perhapsExit(err, 4)
 
-	videos, err := AssembleSearchResults(raw)
+	videos, err := sininen.AssembleSearchResults(raw)
 	perhapsExit(err, 5)
 
 	for _, video := range videos {
