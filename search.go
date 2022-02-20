@@ -29,6 +29,7 @@ func TextQuery(query string, index bleve.Index) (*bleve.SearchResult, error) {
 type SegmentHit struct {
 	StartTime time.Duration
 	EndTime   time.Duration
+	Score     float64
 	Terms     []string // Terms in the segment that matched with the search query.
 }
 
@@ -56,8 +57,8 @@ func locateSegment(segments []interface{}, location *search.Location) int {
 	return position
 }
 
-// newSegmentHit builds a SegmentInt by extracting information from a serialized segment array.
-func newSegmentHit(segments []interface{}, segmentPos int, term string) (*SegmentHit, error) {
+// extractDurations extracts duration information from a serialized segment array.
+func extractDurations(segments []interface{}, segmentPos int) (startTime, endTime time.Duration, err error) {
 	extract := func(i int) (float64, error) {
 		value, valid := segments[i].(float64)
 		if !valid {
@@ -68,17 +69,15 @@ func newSegmentHit(segments []interface{}, segmentPos int, term string) (*Segmen
 
 	floatStart, err := extract(segmentPos * 3)
 	if err != nil {
-		return nil, err
+		return
 	}
 	floatEnd, err := extract(segmentPos*3 + 1)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return &SegmentHit{
-		StartTime: time.Duration(int(floatStart) * int(time.Second)),
-		EndTime:   time.Duration(int(floatEnd) * int(time.Second)),
-		Terms:     []string{term},
-	}, nil
+	startTime = time.Duration(int(floatStart) * int(time.Second))
+	endTime = time.Duration(int(floatEnd) * int(time.Second))
+	return
 }
 
 // AssembleSearchResults builds transcription search results with timestamp information using raw bleve search results.
@@ -106,15 +105,22 @@ func AssembleSearchResults(bleveResults *bleve.SearchResult) ([]SearchResult, er
 					if i < 0 {
 						return nil, errors.New("Failed to locate segment.")
 					}
-					segmentHit, err := newSegmentHit(segments, i, term)
+					start, end, err := extractDurations(segments, i)
 					if err != nil {
 						return nil, err
 					}
 					cachedHit, isCached := hitCache[i]
 					if isCached {
+						cachedHit.Score += hit.Score
 						cachedHit.Terms = append(cachedHit.Terms, term)
 					} else {
-						hitCache[i] = segmentHit
+						// segmentHit, err := newSegmentHit(segments, i, hit.Score, term)
+						hitCache[i] = &SegmentHit{
+							StartTime: start,
+							EndTime:   end,
+							Score:     hit.Score,
+							Terms:     []string{term},
+						}
 					}
 				}
 			}
@@ -131,7 +137,6 @@ func AssembleSearchResults(bleveResults *bleve.SearchResult) ([]SearchResult, er
 				return len(si.Terms) > len(sj.Terms)
 			}
 			return si.StartTime < sj.StartTime
-
 		})
 
 		result = append(result, SearchResult{
