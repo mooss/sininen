@@ -14,7 +14,7 @@ if [ $# -ne 1 ]; then
 fi
 channel_name="$1"
 
-if ! which youtube-dl >/dev/null; then
+if ! which youtube-dl >/dev/null 2>&1; then
     >&2 echo "youtube-dl is a required dependency, see https://ytdl-org.github.io/youtube-dl/download.html to install it."
     exit 2
 fi
