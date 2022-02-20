@@ -24,4 +24,4 @@ fi
 #################
 destfolder="subtitles/$channel_name"
 mkdir -p "$destfolder"
-youtube-dl --skip-download --all-subs "https://www.youtube.com/c/$channel_name" -o "$destfolder/%(id)s.%(ext)s"
+youtube-dl --skip-download --all-subs "https://www.youtube.com/c/$channel_name/videos" -o "$destfolder/%(id)s.%(ext)s"
