@@ -45,10 +45,8 @@ func main() {
 	videos, err := sininen.AssembleSearchResults(raw)
 	perhapsExit(err, 5)
 
-	for _, video := range videos {
-		for _, hit := range video.Segments {
-			fmt.Printf("https://www.youtube.com/watch?v=%s&t=%vs (%v, score=%.3f)\n",
-				video.ID, int(hit.StartTime.Seconds()), hit.Terms, hit.Score)
-		}
+	for _, segment := range videos.ScoredSegments() {
+		fmt.Printf("https://www.youtube.com/watch?v=%s&t=%vs (%v, score=%.3f)\n",
+			segment.ID, int(segment.StartTime.Seconds()), segment.SortedTerms, segment.Score)
 	}
 }

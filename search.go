@@ -20,17 +20,27 @@ func TextQuery(query string, index bleve.Index) (*bleve.SearchResult, error) {
 	return index.Search(request)
 }
 
-/////////////////////////////
-// Search results assembly //
-/////////////////////////////
-// That is to say going from raw bleve results to results catered for audio transcriptions.
-
+////////////////////////////////////
+// Search results data structures //
+////////////////////////////////////
 // SegmentHit represents a transcription segment that matched with a search query.
 type SegmentHit struct {
-	StartTime time.Duration
-	EndTime   time.Duration
-	Score     float64
-	Terms     []string // Terms in the segment that matched with the search query.
+	StartTime   time.Duration
+	EndTime     time.Duration
+	SortedTerms []string // Terms in the segment that matched with the search query, sorted in increasing order.
+}
+
+// NDistinctTerms returns the number of distinct terms in the segment that matched with the search query.
+func (sh SegmentHit) NDistinctTerms() int {
+	result := 0
+	var last string
+	for _, term := range sh.SortedTerms {
+		if term != last {
+			last = term
+			result++
+		}
+	}
+	return result
 }
 
 // SearchResult represents a transcription file that matched with a search query.
@@ -39,6 +49,54 @@ type SearchResult struct {
 	Score    float64
 	Segments []SegmentHit // Segments that matched with the search query.
 }
+
+// SearchResultSequence represents a sequence of transcription files that matched with a search query.
+type SearchResultSequence []SearchResult
+
+func (srs SearchResultSequence) lenSegments() int {
+	result := 0
+	for _, sr := range srs {
+		result += len(sr.Segments)
+	}
+	return result
+}
+
+// ScoredSegment is a SegmentHit with its score and its transcription ID.
+type ScoredSegment struct {
+	SegmentHit
+	Score float64
+	ID    string
+}
+
+// ScoredSegments flattens a search results hierarchy by returning the scored segments, sorted by score.
+func (srs SearchResultSequence) ScoredSegments() []ScoredSegment {
+	result := make([]ScoredSegment, 0, srs.lenSegments())
+	for _, sr := range srs {
+		for _, segment := range sr.Segments {
+			result = append(result, ScoredSegment{
+				SegmentHit: segment,
+				Score:      sr.Score * float64(segment.NDistinctTerms()),
+				ID:         sr.ID,
+			})
+		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		ri, rj := result[i], result[j]
+		if ri.Score != rj.Score {
+			return ri.Score > rj.Score
+		}
+		if ri.ID != rj.ID {
+			return ri.ID < rj.ID
+		}
+		return ri.StartTime < rj.StartTime
+	})
+	return result
+}
+
+/////////////////////////////
+// Search results assembly //
+/////////////////////////////
+// That is to say going from raw bleve results to results catered for audio transcriptions.
 
 // locateSegment returns the index of the segment containing the given location.
 func locateSegment(segments []interface{}, location *search.Location) int {
@@ -81,8 +139,8 @@ func extractDurations(segments []interface{}, segmentPos int) (startTime, endTim
 }
 
 // AssembleSearchResults builds transcription search results with timestamp information using raw bleve search results.
-func AssembleSearchResults(bleveResults *bleve.SearchResult) ([]SearchResult, error) {
-	result := []SearchResult{}
+func AssembleSearchResults(bleveResults *bleve.SearchResult) (SearchResultSequence, error) {
+	result := SearchResultSequence{}
 	for _, hit := range bleveResults.Hits {
 		raw, exists := hit.Fields["Segments"]
 		if !exists {
@@ -111,15 +169,13 @@ func AssembleSearchResults(bleveResults *bleve.SearchResult) ([]SearchResult, er
 					}
 					cachedHit, isCached := hitCache[i]
 					if isCached {
-						cachedHit.Score += hit.Score
-						cachedHit.Terms = append(cachedHit.Terms, term)
+						cachedHit.SortedTerms = append(cachedHit.SortedTerms, term) // Will sort later.
 					} else {
 						// segmentHit, err := newSegmentHit(segments, i, hit.Score, term)
 						hitCache[i] = &SegmentHit{
-							StartTime: start,
-							EndTime:   end,
-							Score:     hit.Score,
-							Terms:     []string{term},
+							StartTime:   start,
+							EndTime:     end,
+							SortedTerms: []string{term},
 						}
 					}
 				}
@@ -128,13 +184,13 @@ func AssembleSearchResults(bleveResults *bleve.SearchResult) ([]SearchResult, er
 
 		sortedSegments := make([]SegmentHit, 0, len(hitCache))
 		for _, el := range hitCache {
-			sort.Strings(el.Terms) // For consistency from one search to the next.
+			sort.Strings(el.SortedTerms)
 			sortedSegments = append(sortedSegments, *el)
 		}
 		sort.Slice(sortedSegments, func(i, j int) bool {
 			si, sj := sortedSegments[i], sortedSegments[j]
-			if len(si.Terms) != len(sj.Terms) { // To ensure stability of the sorting operation.
-				return len(si.Terms) > len(sj.Terms)
+			if len(si.SortedTerms) != len(sj.SortedTerms) { // To ensure stability of the sorting operation.
+				return len(si.SortedTerms) > len(sj.SortedTerms)
 			}
 			return si.StartTime < sj.StartTime
 		})
