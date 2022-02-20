@@ -29,3 +29,11 @@ go build cli/search-yt.go
 ```sh
 ./search-yt HistoriaCivilis "Crossing the Rubicon"
 ```
+
+## Requirements
+
+The usage instructions above should work on a recent Linux distribution provided the following packages are installed and reasonably up-to-date:
+ - Go
+ - youtube-dl
+
+Some adjustments might be needed to make it work on another OS.
