@@ -19,6 +19,7 @@ func main() {
 	flag.Parse()
 	if flag.NArg() != 2 {
 		fmt.Fprintf(os.Stderr, "Usage: %s channel-id search-query\n\nchannel-id must have been downloaded with the script download-channel-subtitles.sh.\n", os.Args[0])
+		os.Exit(6)
 	}
 
 	channelName := flag.Arg(0)
