@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/mooss/sininen"
@@ -16,9 +17,10 @@ func perhapsExit(err error, code int) {
 }
 
 func main() {
+	jsonFlag := flag.Bool("json", false, "Output search results as JSON.")
 	flag.Parse()
 	if flag.NArg() != 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s channel-id search-query\n\nchannel-id must have been downloaded with the script download-channel-subtitles.sh.\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s channel-id search-query [-json]\n\nchannel-id must have been downloaded with the script download-channel-subtitles.sh.\n", os.Args[0])
 		os.Exit(6)
 	}
 
@@ -45,8 +47,15 @@ func main() {
 	videos, err := sininen.AssembleSearchResults(raw)
 	perhapsExit(err, 5)
 
-	for _, segment := range videos.ScoredSegments() {
-		fmt.Printf("https://www.youtube.com/watch?v=%s&t=%vs (%v, score=%.3f)\n",
-			segment.ID, int(segment.StartTime.Seconds()), segment.SortedTerms, segment.Score)
+	scoredSegments := videos.ScoredSegments()
+	if *jsonFlag {
+		marshalledBytes, err := json.Marshal(scoredSegments)
+		perhapsExit(err, 6)
+		fmt.Println(string(marshalledBytes))
+	} else {
+		for _, segment := range scoredSegments {
+			fmt.Printf("https://www.youtube.com/watch?v=%s&t=%vs (%v, score=%.3f)\n",
+				segment.ID, int(segment.StartTime.Seconds()), segment.SortedTerms, segment.Score)
+		}
 	}
 }

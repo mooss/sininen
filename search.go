@@ -25,9 +25,9 @@ func TextQuery(query string, index bleve.Index) (*bleve.SearchResult, error) {
 ////////////////////////////////////
 // SegmentHit represents a transcription segment that matched with a search query.
 type SegmentHit struct {
-	StartTime   time.Duration
-	EndTime     time.Duration
-	SortedTerms []string // Terms in the segment that matched with the search query, sorted in increasing order.
+	StartTime   time.Duration `json:"start_time"`
+	EndTime     time.Duration `json:"end_time"`
+	SortedTerms []string      `json:"sorted_terms"` // Terms in the segment that matched with the search query, sorted in increasing order.
 }
 
 // NDistinctTerms returns the number of distinct terms in the segment that matched with the search query.
@@ -64,8 +64,8 @@ func (srs SearchResultSequence) lenSegments() int {
 // ScoredSegment is a SegmentHit with its score and its transcription ID.
 type ScoredSegment struct {
 	SegmentHit
-	Score float64
-	ID    string
+	Score float64 `json:"score"`
+	ID    string  `json:"id"`
 }
 
 // ScoredSegments flattens a search results hierarchy by returning the scored segments, sorted by score.
