@@ -13,6 +13,7 @@ import (
 ///////////////////
 // bleve helpers //
 ///////////////////
+
 // TextQuery makes a plain text search against an transcription index.
 func TextQuery(query string, index bleve.Index) (*bleve.SearchResult, error) {
 	request := bleve.NewSearchRequest(bleve.NewMatchQuery(query))
@@ -24,6 +25,7 @@ func TextQuery(query string, index bleve.Index) (*bleve.SearchResult, error) {
 ////////////////////////////////////
 // Search results data structures //
 ////////////////////////////////////
+
 // SegmentHit represents a transcription segment that matched with a search query.
 type SegmentHit struct {
 	StartTime   time.Duration `json:"start_time"`
@@ -121,7 +123,7 @@ func extractDurations(segments []interface{}, segmentPos int) (startTime, endTim
 	extract := func(i int) (float64, error) {
 		value, valid := segments[i].(float64)
 		if !valid {
-			return -1, fmt.Errorf("Expected segments[%v] to be of type float64, got %T.", i, segments[i])
+			return -1, fmt.Errorf("expected segments[%v] to be of type float64, got %T", i, segments[i])
 		}
 		return value, nil
 	}
@@ -145,14 +147,14 @@ func AssembleSearchResults(bleveResults *bleve.SearchResult) (SearchResultSequen
 	for _, hit := range bleveResults.Hits {
 		raw, exists := hit.Fields["Segments"]
 		if !exists {
-			return nil, errors.New("Segments are missing from bleve search results.")
+			return nil, errors.New("segments are missing from bleve search results")
 		}
 		segments, valid := raw.([]interface{})
 		if !valid {
-			return nil, fmt.Errorf("Segments should be an array, got %T", raw)
+			return nil, fmt.Errorf("segments should be an array, got %T", raw)
 		}
 		if len(segments)%3 != 0 {
-			return nil, fmt.Errorf("Serialized segments should be a multiple of 3, got %v segments.", len(segments))
+			return nil, fmt.Errorf("serialized segments should be a multiple of 3, got %v segments", len(segments))
 		}
 
 		// Segment hits are cached because search hits for different terms can orrur in the same segment.
@@ -162,7 +164,7 @@ func AssembleSearchResults(bleveResults *bleve.SearchResult) (SearchResultSequen
 				for _, location := range locations {
 					i := locateSegment(segments, location)
 					if i < 0 {
-						return nil, errors.New("Failed to locate segment.")
+						return nil, errors.New("failed to locate segment")
 					}
 					start, end, err := extractDurations(segments, i)
 					if err != nil {

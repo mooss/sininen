@@ -10,6 +10,8 @@ import (
 	"github.com/blevesearch/bleve/v2"
 )
 
+// CreateSubtitleIndex opens, parses and indexes the subtitles file in the given folder and the given language.
+// The created index is saved inside the folder.
 func CreateSubtitleIndex(folder, lang string) (bleve.Index, error) {
 	files, err := ioutil.ReadDir(folder)
 	if err != nil {
@@ -47,6 +49,7 @@ func CreateSubtitleIndex(folder, lang string) (bleve.Index, error) {
 	return index, nil
 }
 
+// OpenTranscriptionIndex opens a stored subtitle index, such as the one created by CreateSubtitleIndex.
 func OpenTranscriptionIndex(folder, lang string) (bleve.Index, error) {
 	return bleve.Open(path.Join(folder, lang+".bleve"))
 }
