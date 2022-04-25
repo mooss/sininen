@@ -2,11 +2,12 @@ package sininen
 
 import (
 	"fmt"
-	"github.com/blevesearch/bleve/v2"
 	"io/ioutil"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/blevesearch/bleve/v2"
 )
 
 func CreateSubtitleIndex(folder, lang string) (bleve.Index, error) {

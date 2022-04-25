@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/mooss/sininen"
 	"os"
 	"path"
+
+	"github.com/mooss/sininen"
 )
 
 func perhapsExit(err error, code int) {

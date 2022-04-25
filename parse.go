@@ -1,9 +1,10 @@
 package sininen
 
 import (
-	"github.com/asticode/go-astisub"
 	"strings"
 	"time"
+
+	"github.com/asticode/go-astisub"
 )
 
 // addSubtitleItem concatenates the content of a subtitle item into a string builder.
